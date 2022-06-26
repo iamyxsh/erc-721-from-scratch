@@ -21,15 +21,11 @@ describe("Happy Path 😁", function () {
   let ERC: ERC721__factory;
   let ERC721: ERC721;
 
-  let owner: Signer,
-    to: Signer,
-    alice: Signer,
-    bob: Signer,
-    notWhitelisted: Signer;
+  let owner: Signer, to: Signer, alice: Signer, bob: Signer;
   let tree: any;
 
   beforeEach(async () => {
-    [owner, to, alice, bob, notWhitelisted] = await ethers.getSigners();
+    [owner, to, alice, bob] = await ethers.getSigners();
 
     tree = generateMerkelTree([
       await owner.getAddress(),
@@ -43,7 +39,7 @@ describe("Happy Path 😁", function () {
     await ERC721.deployed();
   });
 
-  it.skip("should deploy the contract with correct info", async function () {
+  it("should deploy the contract with correct info", async function () {
     const name = await ERC721.name();
     const symbol = await ERC721.symbol();
     const root = await ERC721.MINTER_MERKLE_ROOT();
@@ -55,7 +51,7 @@ describe("Happy Path 😁", function () {
     expect(_owner).to.be.equal(await owner.getAddress());
   });
 
-  it.skip("should mint in bulk and show correct balance + ownerOf", async () => {
+  it("should mint in bulk and show correct balance + ownerOf", async () => {
     const qty = 9;
     const proofForAlice = tree.getHexProof(keccak256(await alice.getAddress()));
 
@@ -84,7 +80,7 @@ describe("Happy Path 😁", function () {
     expect(ownerOfToken9).to.be.equal(await alice.getAddress());
   });
 
-  it.skip("should transfer to a wallet and show correct balance + ownerOf", async () => {
+  it("should transfer to a wallet and show correct balance + ownerOf", async () => {
     const tokenId = 4;
     const qty = 9;
     const proofForOwner = tree.getHexProof(keccak256(await owner.getAddress()));
@@ -137,7 +133,7 @@ describe("Happy Path 😁", function () {
     expect(ownerOfToken3).to.be.equal(await owner.getAddress());
   });
 
-  it.skip("should approve another address and then transfer", async () => {
+  it("should approve another address and then transfer", async () => {
     const tokenId = 4;
     const qty = 9;
     const proofForOwner = tree.getHexProof(keccak256(await owner.getAddress()));
@@ -177,7 +173,47 @@ describe("Happy Path 😁", function () {
     );
   });
 
-  it.skip("should approve for all and then transfer", async () => {
+  it("should approve another address and then transfer", async () => {
+    const tokenId = 4;
+    const qty = 9;
+    const proofForOwner = tree.getHexProof(keccak256(await owner.getAddress()));
+
+    await ERC721.connect(owner).mint(
+      await owner.getAddress(),
+      qty,
+      proofForOwner
+    );
+
+    const approvalOfToken4BeforeApproval = await ERC721.getApproved(tokenId);
+
+    await ERC721.connect(owner).approve(await alice.getAddress(), tokenId);
+
+    const approvalOfToken4AfterApproval = await ERC721.getApproved(tokenId);
+
+    const ownerOfToken4BeforeTransfer = await ERC721.ownerOf(tokenId);
+
+    await ERC721.connect(alice).transferFrom(
+      await owner.getAddress(),
+      await bob.getAddress(),
+      tokenId
+    );
+
+    const ownerOfToken4AfterTransfer = await ERC721.ownerOf(tokenId);
+
+    const approvalOfToken4AfterTransfer = await ERC721.getApproved(tokenId);
+
+    expect(approvalOfToken4BeforeApproval).to.be.equal(
+      ethers.constants.AddressZero
+    );
+    expect(approvalOfToken4AfterApproval).to.be.equal(await alice.getAddress());
+    expect(ownerOfToken4BeforeTransfer).to.be.equal(await owner.getAddress());
+    expect(ownerOfToken4AfterTransfer).to.be.equal(await bob.getAddress());
+    expect(approvalOfToken4AfterTransfer).to.be.equal(
+      ethers.constants.AddressZero
+    );
+  });
+
+  it("should approve for all and then transfer", async () => {
     const tokenId = 4;
     const qty = 9;
     const proofForOwner = tree.getHexProof(keccak256(await owner.getAddress()));
@@ -230,5 +266,55 @@ describe("Happy Path 😁", function () {
     expect(ownerOfToken4AfterTransfer).to.be.equal(await bob.getAddress());
     expect(ownerOfToken5AfterTransfer).to.be.equal(await bob.getAddress());
     expect(ownerOfToken6AfterTransfer).to.be.equal(await bob.getAddress());
+  });
+
+  it("should pause-unpause minting", async () => {
+    const tokenId = 4;
+    const qty = 9;
+    const proofForOwner = tree.getHexProof(keccak256(await owner.getAddress()));
+
+    await ERC721.connect(owner).pauseMinting();
+
+    const minting = ERC721.connect(owner).mint(
+      await owner.getAddress(),
+      qty,
+      proofForOwner
+    );
+
+    await expect(minting).to.be.revertedWith("paused");
+
+    await ERC721.connect(owner).unpauseMinting();
+
+    await ERC721.connect(owner)
+      .connect(owner)
+      .mint(await owner.getAddress(), qty, proofForOwner);
+
+    const ownerOf4 = await ERC721.ownerOf(tokenId);
+
+    expect(ownerOf4).to.be.equal(await owner.getAddress());
+  });
+
+  it("should allow burning token", async () => {
+    const tokenId = 4;
+    const qty = 9;
+    const proofForOwner = tree.getHexProof(keccak256(await owner.getAddress()));
+
+    await ERC721.connect(owner)
+      .connect(owner)
+      .mint(await owner.getAddress(), qty, proofForOwner);
+
+    await ERC721.connect(owner).burn(tokenId);
+
+    const burned = ERC721.ownerOf(tokenId);
+
+    const ownerOf3 = await ERC721.ownerOf(tokenId - 1);
+    const ownerOf5 = await ERC721.ownerOf(tokenId + 1);
+
+    await expect(burned).to.be.revertedWith("token burned");
+
+    expect(ownerOf3).to.be.equal(await owner.getAddress());
+    expect(ownerOf5).to.be.equal(await owner.getAddress());
+    expect(await ERC721.totalBurned()).to.be.equal(1);
+    expect(await ERC721.total()).to.be.equal(qty - 1);
   });
 });

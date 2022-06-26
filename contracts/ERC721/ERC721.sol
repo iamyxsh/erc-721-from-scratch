@@ -74,28 +74,31 @@ contract ERC721 {
         _;
     }
 
-    modifier checkOwnAddrTransfer(address _to) {
-        require(msg.sender != _to, "not allowed to own address");
+    modifier checkOwnAddrTransfer(address _to, uint256 _id) {
+        address _owner = ownerOf(_id);
+        if (_owner == msg.sender) {
+            require(msg.sender != _to, "not allowed to own address");
+        }
         _;
     }
 
     modifier checkMintQuantity(uint256 _quantity) {
-        require(_quantity != 0, "not allowed to own address");
+        require(_quantity != 0, "quantity cannot be zero");
         _;
     }
 
     modifier onlyOwner() {
-        require(msg.sender != owner, "only owner");
+        require(msg.sender == owner, "only owner");
         _;
     }
 
     modifier checkPaused() {
-        require(pause, "already paused");
+        require(pause == true, "unpaused");
         _;
     }
 
     modifier checkUnpaused() {
-        require(!pause, "already unpaused");
+        require(pause == false, "paused");
         _;
     }
 
@@ -137,13 +140,7 @@ contract ERC721 {
         address _from,
         address _to,
         uint256 _id
-    )
-        external
-        payable
-        checkSpender(_id)
-        checkZeroAddress(_to)
-        checkOwnAddrTransfer(_to)
-    {
+    ) external payable {
         safeTransferFrom(_from, _to, _id, "");
     }
 
@@ -157,7 +154,7 @@ contract ERC721 {
         payable
         checkSpender(_id)
         checkZeroAddress(_to)
-        checkOwnAddrTransfer(_to)
+        checkOwnAddrTransfer(_to, _id)
     {
         _transfer(_from, _to, _id);
         require(
@@ -175,7 +172,7 @@ contract ERC721 {
         payable
         checkSpender(_id)
         checkZeroAddress(_to)
-        checkOwnAddrTransfer(_to)
+        checkOwnAddrTransfer(_to, _id)
     {
         _transfer(_from, _to, _id);
     }
@@ -185,7 +182,7 @@ contract ERC721 {
         payable
         checkSpender(_id)
         checkZeroAddress(_to)
-        checkOwnAddrTransfer(_to)
+        checkOwnAddrTransfer(_to, _id)
     {
         _approve(_to, _id);
     }
@@ -193,7 +190,6 @@ contract ERC721 {
     function setApprovalForAll(address _to, bool _approved)
         external
         checkZeroAddress(_to)
-        checkOwnAddrTransfer(_to)
     {
         _setApprovalForAll(msg.sender, _to, _approved);
     }
@@ -219,6 +215,7 @@ contract ERC721 {
         checkZeroAddress(_to)
         checkMintQuantity(_quantity)
         checkMinter(_proofs)
+        checkUnpaused
     {
         uint256 start = total + totalBurned;
         uint256 end = start + _quantity;
@@ -233,7 +230,7 @@ contract ERC721 {
         total = total + _quantity;
     }
 
-    function burn(uint256 _id) external checkSpender(_id) {
+    function burn(uint256 _id) external checkSpender(_id) checkUnpaused {
         owners[_id] = address(this);
 
         if (owners[_id - 1] == address(0)) {
@@ -245,13 +242,15 @@ contract ERC721 {
         }
 
         totalBurned++;
+        balance[msg.sender] -= 1;
+        total--;
     }
 
-    function pauseMinting() external onlyOwner checkPaused {
+    function pauseMinting() external onlyOwner checkUnpaused {
         pause = true;
     }
 
-    function unpauseMinting() external onlyOwner checkUnpaused {
+    function unpauseMinting() external onlyOwner checkPaused {
         pause = false;
     }
 
@@ -263,9 +262,9 @@ contract ERC721 {
         address _owner = ownerOf(_id);
 
         return
-            _isAddress(_owner) ||
+            _requester == _owner ||
             _isApproved(_requester, _id) ||
-            _isApprovedForAll(owners[_id], _requester);
+            _isApprovedForAll(ownerOf(_id), _requester);
     }
 
     function _isAddress(address _address) internal pure returns (bool) {
@@ -330,8 +329,10 @@ contract ERC721 {
         balance[_to] += 1;
         owners[_id] = _to;
 
-        if (owners[_id - 1] == address(0)) {
-            owners[_id - 1] = _from;
+        if (_id > 0) {
+            if (owners[_id - 1] == address(0)) {
+                owners[_id - 1] = _from;
+            }
         }
 
         if (owners[_id + 1] == address(0)) {
