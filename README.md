@@ -51,33 +51,4 @@ Let's say Alice wants to send 20 AWS tokens from Rinkeby to Bob in Mumbai. The f
 
 ### Diagram
 
-
-`Rinkeby`                                                                     `Mumbai`
-
-    ()                                                                           ()
-    || Alice                                                                     || Bob
-   /  \                                                                         /  \
-
-    ||                                                                           /\
-    ||                                                                           ||
-    \/                                                                           ||
-
--------------                                                               -------------   
-|           |                                                               |           |
-|           |                                                               |           |
-|   ERC 20  | `transfer()`                                         `mint()` |   ERC20   |
-|           |                                                               |           |
-|           |                                                               |           |
--------------                                                               -------------
-
-    ||                                                                           /\
-    ||                                                                           ||                    
-    \/                                                                           ||
-                                                                                 
--------------                             --------------                    -------------
-|           |                             |            |                    |           |
-|           |               `listen()`    |            |    `mint()`        |           |
-|   Bridge  | `burn()`  ----------------\ |   Server   | ----------------\  |   Bridge  |
-|           |           ----------------/ |            | ----------------/  |           |
-|           |                             |            |                    |           |
--------------                             --------------                    -------------
+![Diagram](TokenBridge.drawio.png)
