@@ -3,7 +3,7 @@
 import { expect } from "chai";
 import { Signer } from "ethers";
 import { ethers } from "hardhat";
-import { ERC721, ERC721__factory } from "../typechain";
+import { ERC721, ERC721__factory } from "../../typechain";
 
 const { MerkleTree } = require("merkletreejs");
 const keccak256 = require("keccak256");

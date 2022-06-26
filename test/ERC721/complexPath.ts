@@ -3,7 +3,7 @@
 import { expect } from "chai";
 import { Signer } from "ethers";
 import { ethers } from "hardhat";
-import { ERC721, ERC721__factory } from "../typechain";
+import { ERC721, ERC721__factory } from "../../typechain";
 
 const { MerkleTree } = require("merkletreejs");
 const keccak256 = require("keccak256");
@@ -19,7 +19,7 @@ const generateMerkelTree = (addresses: string[]) => {
 
 /*
   In this block I will try to replicate real worl transactions and see how my contract
-  stand against it. Following are some txs that will happen and tests accordingly :-
+  stands against it. Following are some txs that will happen and tests accordingly :-
 
     1. Owner mints 10 tokens (1-10)
     2. Alice mints 5 tokens (11-15)
@@ -44,7 +44,7 @@ const generateMerkelTree = (addresses: string[]) => {
     6. To tokens -> 16, 18
 */
 
-describe("Real world scenario 🌎", async () => {
+describe("Real world scenarios 🌎", async () => {
   let ERC: ERC721__factory;
   let ERC721: ERC721;
 
@@ -69,7 +69,7 @@ describe("Real world scenario 🌎", async () => {
     proofForTo = tree.getHexProof(keccak256(await to.getAddress()));
 
     ERC = await ethers.getContractFactory("ERC721");
-    ERC721 = await ERC.deploy(NAME, SYMBOL, tree.getRoot(), 10);
+    ERC721 = await ERC.deploy(NAME, SYMBOL, tree.getRoot(), 20);
     await ERC721.deployed();
 
     /* Step 1 */
@@ -135,8 +135,9 @@ describe("Real world scenario 🌎", async () => {
     );
   });
 
-  it("should show total = 10", async () => {
+  it("should show total = 18", async () => {
     const total = await ERC721.total();
+    console.log(total);
     expect(total).to.be.equal(18);
   });
 

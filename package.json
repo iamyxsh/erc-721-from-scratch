@@ -33,12 +33,14 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
+    "@openzeppelin/contracts": "^4.6.0",
     "crypto-js": "^4.1.1",
     "keccak256": "^1.0.6",
-    "merkletreejs": "^0.2.32"
+    "merkletreejs": "^0.2.32",
+    "web3": "^1.7.4"
   },
   "scripts": {
     "test": "npx hardhat test",
-    "coverage": "npx hardhat coverage"
+    "coverage": "npx hardhat coverage "
   }
 }

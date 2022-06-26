@@ -2,18 +2,18 @@
 pragma solidity ^0.8.0;
 
 import "../interfaces/IERC721.sol";
+import "../Pausable/Pausable.sol";
+import "../libraries/MerkelTree.sol";
+import "../libraries/Utils.sol";
+
 import "hardhat/console.sol";
 
-contract ERC721 {
+contract ERC721 is Pausable {
     uint256 public total = 0;
     uint256 public totalBurned = 0;
     uint256 public immutable MAX_SUPPLY;
 
-    address public owner;
-
     bytes32 public immutable MINTER_MERKLE_ROOT;
-
-    bool public pause = false;
 
     string public name;
     string public symbol;
@@ -50,17 +50,22 @@ contract ERC721 {
         symbol = _symbol;
         MINTER_MERKLE_ROOT = _minterRoot;
         MAX_SUPPLY = _maxSupply;
-        owner = msg.sender;
     }
 
     modifier checkZeroAddress(address _owner) {
-        require(_isAddress(_owner), "address cannot be zero");
+        require(Utils.isAddress(_owner), "address cannot be zero");
         _;
     }
 
     modifier checkIfTokenMinted(uint256 _id) {
         uint256 totalMinted = total + totalBurned;
         require(_id < totalMinted || _id < MAX_SUPPLY, "invalid _id");
+        _;
+    }
+
+    modifier checkIfMoreThanMaxSupply(uint256 _quantity) {
+        uint256 totalMinted = total + totalBurned;
+        require(totalMinted + _quantity < MAX_SUPPLY, "more than max supply");
         _;
     }
 
@@ -87,23 +92,11 @@ contract ERC721 {
         _;
     }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "only owner");
-        _;
-    }
-
-    modifier checkPaused() {
-        require(pause == true, "unpaused");
-        _;
-    }
-
-    modifier checkUnpaused() {
-        require(pause == false, "paused");
-        _;
-    }
-
     modifier checkMinter(bytes32[] calldata _proofs) {
-        require(_verify(_proofs), "not a whitelisted minter");
+        require(
+            MerkelTree.verify(_proofs, msg.sender, MINTER_MERKLE_ROOT),
+            "not a whitelisted minter"
+        );
         _;
     }
 
@@ -158,7 +151,7 @@ contract ERC721 {
     {
         _transfer(_from, _to, _id);
         require(
-            _implOnERC721Recieved(_from, _to, _id, _data),
+            Utils.implOnERC721Recieved(_from, _to, _id, _data),
             "cannot transfer token"
         );
     }
@@ -216,6 +209,7 @@ contract ERC721 {
         checkMintQuantity(_quantity)
         checkMinter(_proofs)
         checkUnpaused
+        checkIfMoreThanMaxSupply(_quantity)
     {
         uint256 start = total + totalBurned;
         uint256 end = start + _quantity;
@@ -244,14 +238,6 @@ contract ERC721 {
         totalBurned++;
         balance[msg.sender] -= 1;
         total--;
-    }
-
-    function pauseMinting() external onlyOwner checkUnpaused {
-        pause = true;
-    }
-
-    function unpauseMinting() external onlyOwner checkPaused {
-        pause = false;
     }
 
     function _approvedOrOwner(address _requester, uint256 _id)
@@ -285,39 +271,6 @@ contract ERC721 {
         returns (bool)
     {
         return approvedForAll[_owner][_requester];
-    }
-
-    function _implOnERC721Recieved(
-        address _from,
-        address _to,
-        uint256 _id,
-        bytes memory data
-    ) private returns (bool) {
-        if (_isContract(_to)) {
-            try IERC721(_to).onERC721Received(_to, _from, _id, data) returns (
-                bytes4 retval
-            ) {
-                return retval == IERC721.onERC721Received.selector;
-            } catch (bytes memory reason) {
-                if (reason.length == 0) {
-                    revert("cannot transfer token");
-                } else {
-                    assembly {
-                        revert(add(32, reason), mload(reason))
-                    }
-                }
-            }
-        } else {
-            return true;
-        }
-    }
-
-    function _isContract(address _addr) private view returns (bool isContract) {
-        uint32 size;
-        assembly {
-            size := extcodesize(_addr)
-        }
-        return (size > 0);
     }
 
     function _transfer(
@@ -356,21 +309,5 @@ contract ERC721 {
     ) internal {
         approvedForAll[_owner][_to] = _approved;
         emit ApprovalForAll(_owner, _to, _approved);
-    }
-
-    function _verify(bytes32[] calldata _proofs) private view returns (bool) {
-        bytes32 hash = keccak256(abi.encodePacked(msg.sender));
-
-        for (uint256 i = 0; i < _proofs.length; i++) {
-            bytes32 proofElement = _proofs[i];
-
-            if (hash < proofElement) {
-                hash = keccak256(abi.encodePacked(hash, proofElement));
-            } else {
-                hash = keccak256(abi.encodePacked(proofElement, hash));
-            }
-        }
-
-        return hash == MINTER_MERKLE_ROOT;
     }
 }

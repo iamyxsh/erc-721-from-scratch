@@ -3,7 +3,7 @@
 import { expect } from "chai";
 import { Signer } from "ethers";
 import { ethers } from "hardhat";
-import { ERC721, ERC721__factory } from "../typechain";
+import { ERC721, ERC721__factory } from "../../typechain";
 
 const { MerkleTree } = require("merkletreejs");
 const keccak256 = require("keccak256");
@@ -88,6 +88,21 @@ describe("Wrong path ❌", () => {
     );
 
     await expect(minting).to.be.revertedWith("address cannot be zero");
+
+    expect(await ERC721.total()).to.be.equal(0);
+  });
+
+  it("should not allow minting more than MAX_SUPPLY", async () => {
+    const qty = 11;
+    const proofForAlice = tree.getHexProof(keccak256(await alice.getAddress()));
+
+    const minting = ERC721.connect(alice).mint(
+      await alice.getAddress(),
+      qty,
+      proofForAlice
+    );
+
+    await expect(minting).to.be.revertedWith("more than max supply");
 
     expect(await ERC721.total()).to.be.equal(0);
   });

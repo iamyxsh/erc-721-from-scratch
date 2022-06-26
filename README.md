@@ -1,46 +1,83 @@
-# Advanced Sample Hardhat Project
+# Polygon Project
 
-This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
+These projects demonstrate my skills in Solidity and a practical understading of how the web3 🌎 works.
 
-The project comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts. It also comes with a variety of other tools, preconfigured to work with the project code.
+This repo comprises of 2 web3 project, mainly a customised ERC721 and a token bridge between 2 different EVM compatible chains.
 
-Try running some of the following tasks:
+### Prerequisites
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-npx hardhat help
-REPORT_GAS=true npx hardhat test
-npx hardhat coverage
-npx hardhat run scripts/deploy.ts
-TS_NODE_FILES=true npx ts-node scripts/deploy.ts
-npx eslint '**/*.{js,ts}'
-npx eslint '**/*.{js,ts}' --fix
-npx prettier '**/*.{json,sol,md}' --check
-npx prettier '**/*.{json,sol,md}' --write
-npx solhint 'contracts/**/*.sol'
-npx solhint 'contracts/**/*.sol' --fix
+    1. Latest Node
+    2. Latest NPM
+
+## ERC-721
+
+### Features
+
+    1. `Pausable` : The owner of the smart contract can pause the minting functionality of the smart contract. When `paused`, no one can mint a new token.
+
+    2. `Burnable` : The owner/approved-address of the token can `burn` the token. This will transfer the owner of the token back to `address(this)` , i.e, the smart contract itself where it can not be transfered ahead. The burned token will not be counted in the `total` minted token but will hold it's own state , i.e, `totalBurned`.
+
+    3. `Whitelisted`: Only the users who have been `whitelisted` by the deployer of the smart contract can mint the tokens. The deployer needs to provide the `root` of the `merkel tree` of all the whitelisted users during deployment. When minting a token, the client should provide `proof` of the `leaf` that corresponds to the minter's address. If the `proof` is sufficient and results in the correct hash, user can mint the token.
+
+    4. `Ownable` : The smart contract will set an `owner` when initialised. This `owner` can perform certain tasks such as `pausing` and `unpausing` the minting functionality.
+
+### Run Tests
+
+To run the tests, enter the following commands.
+
+Optional: if packages are not installed.
+
+```bash
+    npm install
 ```
 
-# Etherscan verification
-
-To try out Etherscan verification, you first need to deploy a contract to an Ethereum network that's supported by Etherscan, such as Ropsten.
-
-In this project, copy the .env.example file to a file named .env, and then edit it to fill in the details. Enter your Etherscan API key, your Ropsten node URL (eg from Alchemy), and the private key of the account which will send the deployment transaction. With a valid .env file in place, first deploy your contract:
-
-```shell
-hardhat run --network ropsten scripts/deploy.ts
+```bash
+    npx hardhat test
 ```
 
-Then, copy the deployment address and paste it in to replace `DEPLOYED_CONTRACT_ADDRESS` in this command:
+## Token Bridge
 
-```shell
-npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
-```
+This project tries to create a bridge between 2 EVM compatible chains, allowing users to send an ERC20 token from one chain to another. Intra-chain txs will happen as usual but inter-chain txs will require burning, minting and a server listening to the events. To make it tamper proof, I have added a signature feature as well that will protect it against a hacker who has hacked the intermediatory server and tries to send malicious requests.
 
-# Performance optimizations
+### Example
 
-For faster runs of your tests and scripts, consider skipping ts-node's type checking by setting the environment variable `TS_NODE_TRANSPILE_ONLY` to `1` in hardhat's environment. For more details see [the documentation](https://hardhat.org/guides/typescript.html#performance-optimizations).
+Let's say Alice wants to send 20 AWS tokens from Rinkeby to Bob in Mumbai. The following are the steps that will happend in order to create a successfull transaction b/w these two.
+
+    1. Alice needs to send 20 AWS tokens to a Bridge smart contract on the Rinkeby network. This smart contract will `burn` 20 tokens in the ERC20 smart contract, deducting 20 AWS from Alice's balance.
+    2. This Bridge smart contract will `emit` an event with all the details of the txs.
+    3. This event will be heard by a server who will listen to events from the Bridge smart contract.
+    4. This server will then call the `mint` function on the Bridge smart contract on Mumbai which already has the ERC20 contract address of the AWS token on Mumbai.
+    5. The `mint` function then calls the original AWS ERC20 contract interface and mints 20 tokens to Bob's address.
+
+### Diagram
+
+
+`Rinkeby`                                                                     `Mumbai`
+
+    ()                                                                           ()
+    || Alice                                                                     || Bob
+   /  \                                                                         /  \
+
+    ||                                                                           /\
+    ||                                                                           ||
+    \/                                                                           ||
+
+-------------                                                               -------------   
+|           |                                                               |           |
+|           |                                                               |           |
+|   ERC 20  | `transfer()`                                         `mint()` |   ERC20   |
+|           |                                                               |           |
+|           |                                                               |           |
+-------------                                                               -------------
+
+    ||                                                                           /\
+    ||                                                                           ||                    
+    \/                                                                           ||
+                                                                                 
+-------------                             --------------                    -------------
+|           |                             |            |                    |           |
+|           |               `listen()`    |            |    `mint()`        |           |
+|   Bridge  | `burn()`  ----------------\ |   Server   | ----------------\  |   Bridge  |
+|           |           ----------------/ |            | ----------------/  |           |
+|           |                             |            |                    |           |
+-------------                             --------------                    -------------
