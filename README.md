@@ -1,4 +1,4 @@
-# Polygon Project
+# Project
 
 These projects demonstrate my skills in Solidity and a practical understading of how the web3 🌎 works.
 
